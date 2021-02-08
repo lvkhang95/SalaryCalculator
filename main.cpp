@@ -8,8 +8,8 @@
 
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <vector>
-#include <algorithm>
 #include <chrono>
 #include <ctime>
 
@@ -18,96 +18,75 @@
 
 using namespace std;
 
-
-template <typename T>
-void remove_duplicates(vector<T>& vec)
-{
-  sort(vec.begin(), vec.end());
-  vec.erase(unique(vec.begin(), vec.end()), vec.end());
-  vec.shrink_to_fit();
-}
-
-void Toggle(bool& state){
-	state = (!state);
-}
-
 class Employee {
 public:
-	string name;
-	int revenue;
-	int cheatedCount;
-	Employee(string& empName) {
-		this->name = empName;
-		this->revenue = 1;
-		this->cheatedCount = 0;
-	}
-	Employee(){
-		this->name = "";
-		this->revenue = 0;
-		this->cheatedCount = 0;
-	}
-	void setReport(int amount){
-		this->revenue += amount;
+	string m_name;
+	int m_hours;
+	int m_minutes;
+	Employee(string empName) {
+		m_name = empName;
+		m_hours = 0;
+		m_minutes = 0;
 	}
 };
 
 void PushToDatabase(vector<Employee>& vec){
 	ofstream outFile;
 	auto timeNow = chrono::system_clock::to_time_t(chrono::system_clock::now());
-	outFile.open(OUT_FILE_NAME, std::ios_base::app);
+	outFile.open(OUT_FILE_NAME);
 	outFile << "---------------------------" << endl <<
 			   "From: " << IN_FILE_NAME << endl <<
 			   "On: " << ctime(&timeNow) << endl;
-	outFile.close();
 	for(auto employee : vec){
-		outFile.open(OUT_FILE_NAME, std::ios_base::app);//append instead of overwrite
-		outFile << employee.name << " " << employee.revenue << endl;
-		outFile.close();
+		if (employee.m_minutes < 60)
+			outFile << employee.m_name << " " << employee.m_hours << ":" << employee.m_minutes << endl;
+		else {
+			employee.m_hours += (int)(employee.m_minutes / 60);
+			employee.m_minutes %= 60;
+			outFile << employee.m_name << " " << employee.m_hours << ":" << employee.m_minutes << endl;
+		}
 	}
+	outFile.close();
 }
 
 int main() {
-	Employee newEmployee;
-	vector<Employee> employeeList{newEmployee};
+	vector<Employee> employeeList;
 	ifstream readFile(IN_FILE_NAME);
 	string line = "";
 	while(getline(readFile, line)){
-		line.push_back('@');
-		bool isRecording = false;
-		vector<string> nameList;
-		string name = "";
-		for(char toBeCheckedInLine : line){
-			if(toBeCheckedInLine == '@'){
-				isRecording = true;
-				if(name.size() != 0){
-					nameList.push_back(name);
-					name.clear();
-				}
+		if (line.find('@') != string::npos){
+			string storedName = line.substr(line.find('@') + 1);
+			while (storedName.back() == ' '){
+				storedName.pop_back();
+				storedName.shrink_to_fit();
 			}
-			else if(isRecording && toBeCheckedInLine!=' ')
-					name.push_back(toBeCheckedInLine);
-		}
-		remove_duplicates(nameList);
-		for(auto name : nameList){
-			int index = 0;
-			bool isStored = false;
-			for(auto anEmp : employeeList){
-				if(anEmp.name == name){
-					isStored = true;
-					break;
-				}
-				index++;
+			string valueStr = line.substr(0, line.find('@'));
+			while (valueStr.find(' ') != string::npos){
+				valueStr.erase(valueStr.find(' '));
+				valueStr.shrink_to_fit();
 			}
-			if(isStored){
-				employeeList[index].setReport(1);
+			Employee swat(storedName);
+			swat.m_hours = stoi(valueStr.substr(0, valueStr.find('h')));
+			swat.m_minutes = stoi(valueStr.substr(valueStr.find('h') + 1));
+			cout << swat.m_name << " " << swat.m_hours << " " << swat.m_minutes << endl;
+			if (employeeList.size()) {
+				bool found = false;
+				for (auto swatIt = employeeList.begin(); swatIt < employeeList.end(); swatIt++){
+					if (storedName == swatIt->m_name){
+						swatIt->m_hours += swat.m_hours;
+						swatIt->m_minutes += swat.m_minutes;
+						found = true;
+						break;
+					}
+				}
+				if (!found){
+					employeeList.push_back(swat);
+				}
 			}
 			else{
-				Employee employee{name};
-				employeeList.push_back(employee);
+				employeeList.push_back(swat);
 			}
 		}
 	}
-	employeeList.erase(employeeList.begin());
-	employeeList.shrink_to_fit();
 	PushToDatabase(employeeList);
 }
